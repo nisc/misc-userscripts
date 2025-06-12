@@ -30,6 +30,7 @@ These scripts have been tested with Firefox and Violentmonkey on macOS, but shou
 | Script Name | Description |
 |-------------|-------------|
 | [`firefox-duplicate-tab.user.js`](firefox-duplicate-tab.user.js) | Adds keyboard shortcut to duplicate the current tab (⌘+SHIFT+E on Mac, CTRL+SHIFT+E on Windows) while preserving scroll position. |
+| [`youtube-invidious-redirect.user.js`](youtube-invidious-redirect.user.js) | Automatically redirects YouTube watch pages to a random Invidious instance for a more privacy-focused and bloat-free viewing experience. |
 
 ## Contributing
 
