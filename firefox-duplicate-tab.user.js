@@ -1,14 +1,14 @@
 // ==UserScript==
 // @name         Firefox Duplicate Tab
 // @namespace    nisc
-// @version      2025.06.08-A
+// @version      2025.06.11-A
 // @description  Adds keyboard shortcut to duplicate the current tab (⌘+SHIFT+E on Mac, CTRL+SHIFT+E on Windows)
 // @homepageURL  https://github.com/nisc/misc-userscripts
 // @downloadURL  https://raw.githubusercontent.com/nisc/misc-userscripts/main/firefox-duplicate-tab.user.js
 // @author       nisc
 // @match        *://*/*
 // @icon         https://www.mozilla.org/media/img/favicons/firefox/browser/favicon.f093404c0135.ico
-// @run-at       document-end
+// @run-at       document-start
 // @grant        none
 // ==/UserScript==
 
@@ -32,6 +32,7 @@
  * - Handles URL parameters cleanly via URLSearchParams
  * - Uses platform detection for appropriate keyboard shortcuts
  */
+
 (function() {
   'use strict';
 
@@ -75,16 +76,22 @@
     const isDuplicate = params.get(CONFIG.URL_PARAM) === CONFIG.URL_PARAM_VALUE;
 
     if (isDuplicate && window.opener) {
-      // Restore scroll position from original tab
-      window.scrollTo(0, window.opener.scrollY);
-
-      // Clean up URL
+      // Clean up URL first
       params.delete(CONFIG.URL_PARAM);
       const newSearch = params.toString();
       const newUrl = window.location.pathname +
         (newSearch ? '?' + newSearch : '') +
         window.location.hash;
       history.replaceState(null, '', newUrl);
+
+      // Restore scroll position when the page is ready
+      if (document.readyState === 'complete') {
+        window.scrollTo(0, window.opener.scrollY);
+      } else {
+        window.addEventListener('load', function() {
+          window.scrollTo(0, window.opener.scrollY);
+        });
+      }
     }
   }
 
