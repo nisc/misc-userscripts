@@ -1,12 +1,13 @@
 // ==UserScript==
 // @name         YouTube - Invidious Redirect
 // @namespace    nisc
-// @version      2025.06.11-A
+// @version      2025.07.12-A
 // @description  Always redirects YouTube watch pages to a random Invidious instance
 // @homepageURL  https://github.com/nisc/misc-userscripts
 // @downloadURL  https://raw.githubusercontent.com/nisc/misc-userscripts/main/youtube-invidious-redirect.user.js
 // @author       nisc
 // @match        https://www.youtube.com/watch?*
+// @match        https://m.youtube.com/watch?*
 // @icon         https://www.youtube.com/favicon.ico
 // @run-at       document-start
 // @grant        none
