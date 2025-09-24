@@ -1,10 +1,10 @@
 // ==UserScript==
-// @name         Firefox Duplicate Tab
+// @name         Duplicate Tab
 // @namespace    nisc
-// @version      2025.06.11-A
-// @description  Adds keyboard shortcut to duplicate the current tab (⌘+SHIFT+E on Mac, CTRL+SHIFT+E on Windows)
+// @version      2025.09.24-A
+// @description  Adds a cross-browser keyboard shortcut (Shift+⌘/Ctrl+E) to duplicate the current tab
 // @homepageURL  https://github.com/nisc/misc-userscripts
-// @downloadURL  https://raw.githubusercontent.com/nisc/misc-userscripts/main/firefox-duplicate-tab.user.js
+// @downloadURL  https://raw.githubusercontent.com/nisc/misc-userscripts/main/duplicate-tab.user.js
 // @author       nisc
 // @match        *://*/*
 // @icon         https://www.mozilla.org/media/img/favicons/firefox/browser/favicon.f093404c0135.ico
@@ -13,14 +13,14 @@
 // ==/UserScript==
 
 /**
- * Firefox Duplicate Tab Userscript
+ * Duplicate Tab Userscript
  *
  * This userscript adds a keyboard shortcut to duplicate the current browser tab
  * while preserving the scroll position. It's particularly useful when you want to
  * keep your place in a long article or document while opening it in a new tab.
  *
  * Features:
- * - Cross-platform keyboard shortcuts (⌘+SHIFT+E on macOS, CTRL+SHIFT+E elsewhere)
+ * - Cross-platform keyboard shortcuts (Shift+⌘+E on macOS, Ctrl+Shift+E elsewhere)
  * - Preserves scroll position in the duplicated tab
  * - Cleans up the URL after duplication (removes tracking parameter)
  * - Only runs in main window (not in iframes)
