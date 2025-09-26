@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         LinkedIn Tweaks
 // @namespace    nisc
-// @version      2025.09.24-A
+// @version      2025.09.25-A
 // @description  Various usability improvements for LinkedIn
 // @homepageURL  https://github.com/nisc/misc-userscripts
 // @downloadURL  https://raw.githubusercontent.com/nisc/misc-userscripts/main/linkedin-tweaks.user.js
@@ -24,7 +24,7 @@
 (function() {
   'use strict';
 
-  const TARGET_URL_PREFIX = 'https://www.linkedin.com/jobs/search/post-apply/';
+  const TARGET_URL_PATTERN = /^https:\/\/www\.linkedin\.com\/jobs\/[^\s]*\/post-apply\//;
   const DISMISS_BUTTON_SELECTOR = 'button.artdeco-modal__dismiss[aria-label="Dismiss"]';
   const CLICK_DELAY_MS = 250;
   const POLL_INTERVAL_MS = 250;
@@ -112,7 +112,7 @@
   };
 
   const matchesTargetLocation = () => {
-    return window.location.href.startsWith(TARGET_URL_PREFIX);
+    return TARGET_URL_PATTERN.test(window.location.href);
   };
 
   const startMonitoring = () => {
