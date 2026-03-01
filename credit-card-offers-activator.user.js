@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Credit Card Offers Activator
 // @namespace    nisc
-// @version      2026.03.01-B
+// @version      2026.03.01-C
 // @description  Adds a button to activate all visible offers on Amex, Citi, and Chase offers pages
 // @homepageURL  https://github.com/nisc/misc-userscripts
 // @downloadURL  https://raw.githubusercontent.com/nisc/misc-userscripts/main/credit-card-offers-activator.user.js
@@ -38,13 +38,23 @@
   const STYLE_ID = 'offers-activator-userscript-style';
 
   const BUTTON_LABEL = 'Activate All Offers';
+  const BUTTON_LABEL_RUNNING = 'Activating...';
   const BUTTON_TITLE_ACTIVE = 'Activate all visible offers';
   const BUTTON_TITLE_DISABLED = 'No activatable offers found';
+  const BUTTON_TITLE_RUNNING = 'Activating Chase offers';
 
   const CLICK_INTERVAL_MS = 500;
   const FINAL_SETTLE_EXTRA_MS = 300;
   const MIN_FINAL_REFRESH_DELAY_MS = 250;
   const MUTATION_DEBOUNCE_MS = 120;
+  const CHASE_NAVIGATION_TIMEOUT_MS = 12000;
+  const CHASE_HUB_SETTLE_MS = 350;
+  const CHASE_MAX_ITERATIONS = 500;
+  const CHASE_STALL_LIMIT = 15;
+  const CHASE_CLICK_SETTLE_MS = 150;
+  const CHASE_POST_CLICK_NAV_WAIT_MS = 3500;
+  const CHASE_TILE_ADD_WAIT_MS = 3000;
+  const CHASE_SCROLL_WAIT_MS = 300;
 
   const MODE_INLINE = 'inline';
   const MODE_FLOATING = 'floating';
@@ -68,6 +78,8 @@
   const CHASE_TILE_ADD_ICON_SELECTOR = '[data-testid="commerce-tile-button"]';
   const CHASE_TILE_ADDED_SELECTOR = '[data-testid="offer-tile-alert-container-success"]';
   const CHASE_TILE_ADDED_TEXT_PATTERN = /success added/i;
+  const CHASE_HUB_URL_PATTERN = /#\/dashboard\/merchantOffers\/offer-hub(?:\?|$)/i;
+  const CHASE_ACTIVATED_URL_PATTERN = /#\/dashboard\/merchantOffers\/offer-activated\/[^?]+(?:\?|$)/i;
 
   const SITE_CONFIG = {
     amex: {
@@ -82,17 +94,18 @@
     },
     chase: {
       id: 'chase',
-      pattern: /https:\/\/secure\.chase\.com\/web\/auth\/dashboard#\/dashboard\/merchantOffers\/offer-hub/i,
+      pattern: /https:\/\/secure\.chase\.com\/web\/auth\/dashboard#\/dashboard\/merchantOffers\/(?:offer-hub|offer-activated)/i,
       placement: 'floating'
     }
   };
 
-  /** @type {{ buttonEl: HTMLButtonElement | null, currentMode: string | null, currentSiteId: string | null, lastHref: string }} */
+  /** @type {{ buttonEl: HTMLButtonElement | null, currentMode: string | null, currentSiteId: string | null, lastHref: string, isChaseLoopRunning: boolean }} */
   const state = {
     buttonEl: null,
     currentMode: null,
     currentSiteId: null,
-    lastHref: window.location.href
+    lastHref: window.location.href,
+    isChaseLoopRunning: false
   };
 
   /** @type {number | null} */
@@ -248,6 +261,101 @@
     return genericControls;
   }
 
+  function isChaseOfferHubUrl() {
+    return CHASE_HUB_URL_PATTERN.test(window.location.href);
+  }
+
+  function isChaseOfferActivatedUrl() {
+    return CHASE_ACTIVATED_URL_PATTERN.test(window.location.href);
+  }
+
+  function getChaseAccountIdFromUrl(href = window.location.href) {
+    const match = href.match(/[?&]accountId=([^&#]+)/i);
+    if (!match || !match[1]) {
+      return '';
+    }
+
+    try {
+      return decodeURIComponent(match[1]);
+    } catch (_) {
+      return match[1];
+    }
+  }
+
+  function buildChaseOfferHubUrl() {
+    const baseUrl = window.location.href.split('#')[0] + '#/dashboard/merchantOffers/offer-hub';
+    const accountId = getChaseAccountIdFromUrl();
+    return accountId ? baseUrl + '?accountId=' + encodeURIComponent(accountId) : baseUrl;
+  }
+
+  function sleep(ms) {
+    return new Promise((resolve) => {
+      window.setTimeout(resolve, ms);
+    });
+  }
+
+  async function waitForCondition(conditionFn, timeoutMs) {
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+      if (conditionFn()) {
+        return true;
+      }
+      await sleep(100);
+    }
+
+    return conditionFn();
+  }
+
+  async function ensureChaseOfferHub() {
+    if (isChaseOfferHubUrl()) {
+      return true;
+    }
+
+    if (isChaseOfferActivatedUrl()) {
+      window.history.back();
+      const returnedToHub = await waitForCondition(isChaseOfferHubUrl, CHASE_NAVIGATION_TIMEOUT_MS);
+      if (returnedToHub) {
+        await sleep(CHASE_HUB_SETTLE_MS);
+        return true;
+      }
+    }
+
+    window.location.assign(buildChaseOfferHubUrl());
+    const reachedHub = await waitForCondition(isChaseOfferHubUrl, CHASE_NAVIGATION_TIMEOUT_MS);
+    if (reachedHub) {
+      await sleep(CHASE_HUB_SETTLE_MS);
+    }
+    return reachedHub;
+  }
+
+  function getNextChaseActivatableTile() {
+    const tiles = getChaseActivatableTiles();
+    return tiles.length > 0 ? tiles[0] : null;
+  }
+
+  async function tryLoadMoreChaseTiles() {
+    if (getNextChaseActivatableTile()) {
+      return true;
+    }
+
+    const previousY = window.scrollY;
+    const scrollDelta = Math.max(Math.round(window.innerHeight * 0.9), 500);
+    window.scrollBy({ top: scrollDelta, behavior: 'auto' });
+    await sleep(CHASE_SCROLL_WAIT_MS);
+
+    if (getNextChaseActivatableTile()) {
+      return true;
+    }
+
+    if (window.scrollY === previousY) {
+      await sleep(CHASE_SCROLL_WAIT_MS);
+      return getNextChaseActivatableTile() !== null;
+    }
+
+    return false;
+  }
+
   function ensureStyles() {
     if (document.getElementById(STYLE_ID)) {
       return;
@@ -338,11 +446,20 @@
       return;
     }
 
+    if (state.isChaseLoopRunning) {
+      button.disabled = true;
+      button.title = BUTTON_TITLE_RUNNING;
+      button.textContent = BUTTON_LABEL_RUNNING;
+      button.classList.add('offers-activator-button--disabled');
+      return;
+    }
+
     const remainingOffers = getActivatableOfferControls().length;
     const hasRemainingOffers = remainingOffers > 0;
 
     button.disabled = !hasRemainingOffers;
     button.title = hasRemainingOffers ? BUTTON_TITLE_ACTIVE : BUTTON_TITLE_DISABLED;
+    button.textContent = BUTTON_LABEL;
     button.classList.toggle('offers-activator-button--disabled', !hasRemainingOffers);
   }
 
@@ -368,6 +485,12 @@
   }
 
   function clickOfferButtons() {
+    const site = getCurrentSite();
+    if (site && site.id === SITE_CONFIG.chase.id) {
+      void runChaseActivationLoop();
+      return;
+    }
+
     const controls = getActivatableOfferControls();
 
     controls.forEach((control, index) => {
@@ -391,6 +514,73 @@
     setTimeout(() => {
       updateActivatorButtonState();
     }, finalDelay);
+  }
+
+  async function runChaseActivationLoop() {
+    if (state.isChaseLoopRunning) {
+      return;
+    }
+
+    state.isChaseLoopRunning = true;
+    updateActivatorButtonState();
+
+    try {
+      let stallCount = 0;
+
+      for (let i = 0; i < CHASE_MAX_ITERATIONS; i += 1) {
+        const onHub = await ensureChaseOfferHub();
+        if (!onHub) {
+          break;
+        }
+
+        let tile = getNextChaseActivatableTile();
+        if (!tile) {
+          const loadedMore = await tryLoadMoreChaseTiles();
+          tile = getNextChaseActivatableTile();
+
+          if (!tile) {
+            if (!loadedMore) {
+              break;
+            }
+
+            stallCount += 1;
+            if (stallCount >= CHASE_STALL_LIMIT) {
+              break;
+            }
+            continue;
+          }
+        }
+
+        const tileId = tile.id || '';
+        tile.scrollIntoView({ block: 'center', inline: 'nearest' });
+        await sleep(CHASE_CLICK_SETTLE_MS);
+        tile.click();
+
+        const navigatedAwayFromHub = await waitForCondition(() => !isChaseOfferHubUrl(), CHASE_POST_CLICK_NAV_WAIT_MS);
+
+        if (navigatedAwayFromHub) {
+          const backOnHub = await ensureChaseOfferHub();
+          if (!backOnHub) {
+            stallCount += 1;
+            if (stallCount >= CHASE_STALL_LIMIT) {
+              break;
+            }
+            continue;
+          }
+        } else if (tileId) {
+          await waitForCondition(() => {
+            const current = document.getElementById(tileId);
+            return !current || isChaseTileAlreadyAdded(current);
+          }, CHASE_TILE_ADD_WAIT_MS);
+        }
+
+        stallCount = 0;
+        await sleep(CHASE_HUB_SETTLE_MS);
+      }
+    } finally {
+      state.isChaseLoopRunning = false;
+      updateActivatorButtonState();
+    }
   }
 
   function createButtonElement() {
