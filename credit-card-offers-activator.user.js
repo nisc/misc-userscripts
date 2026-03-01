@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Credit Card Offers Activator
 // @namespace    nisc
-// @version      2026.03.01-F
+// @version      2026.03.01-G
 // @description  Adds a button to activate all visible offers on Amex, Citi, and Chase offers pages
 // @homepageURL  https://github.com/nisc/misc-userscripts
 // @downloadURL  https://raw.githubusercontent.com/nisc/misc-userscripts/main/credit-card-offers-activator.user.js
@@ -55,6 +55,7 @@
   const CHASE_POST_CLICK_NAV_WAIT_MS = 3500;
   const CHASE_TILE_ADD_WAIT_MS = 3000;
   const CHASE_SCROLL_WAIT_MS = 300;
+  const URL_POLL_INTERVAL_MS = 500;
 
   const MODE_INLINE = 'inline';
   const MODE_FLOATING = 'floating';
@@ -333,6 +334,13 @@
   function getRemainingOfferCount(site = getCurrentSite()) {
     if (site && site.id === SITE_CONFIG.citi.id) {
       return getCitiRemainingOfferCount();
+    }
+
+    if (site && site.id === SITE_CONFIG.chase.id) {
+      if (!isChaseOfferHubUrl()) {
+        return 0;
+      }
+      return getChaseActivatableTiles().length;
     }
 
     return getActivatableOfferControls().length;
@@ -735,6 +743,23 @@
     }, MUTATION_DEBOUNCE_MS);
   }
 
+  function patchHistoryNavigation(onNavigate) {
+    const originalPushState = window.history.pushState;
+    const originalReplaceState = window.history.replaceState;
+
+    window.history.pushState = function pushStatePatched(...args) {
+      const result = originalPushState.apply(this, args);
+      onNavigate();
+      return result;
+    };
+
+    window.history.replaceState = function replaceStatePatched(...args) {
+      const result = originalReplaceState.apply(this, args);
+      onNavigate();
+      return result;
+    };
+  }
+
   function initialize() {
     if (document.body) {
       ensureActivatorButton();
@@ -742,9 +767,16 @@
       window.addEventListener('DOMContentLoaded', ensureActivatorButton, { once: true });
     }
 
+    patchHistoryNavigation(ensureActivatorButton);
+
     // Handle SPA navigation (especially Chase hash/dashboard transitions).
     window.addEventListener('hashchange', ensureActivatorButton);
     window.addEventListener('popstate', ensureActivatorButton);
+    window.setInterval(() => {
+      if (window.location.href !== state.lastHref) {
+        ensureActivatorButton();
+      }
+    }, URL_POLL_INTERVAL_MS);
 
     // Reposition when dynamic page content (like Amex offers sections) mounts.
     const observer = new MutationObserver(() => {
