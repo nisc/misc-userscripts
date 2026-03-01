@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Credit Card Offers Activator
 // @namespace    nisc
-// @version      2026.03.01-G
+// @version      2026.03.01-H
 // @description  Adds a button to activate all visible offers on Amex, Citi, and Chase offers pages
 // @homepageURL  https://github.com/nisc/misc-userscripts
 // @downloadURL  https://raw.githubusercontent.com/nisc/misc-userscripts/main/credit-card-offers-activator.user.js
@@ -57,10 +57,6 @@
   const CHASE_SCROLL_WAIT_MS = 300;
   const URL_POLL_INTERVAL_MS = 500;
 
-  const MODE_INLINE = 'inline';
-  const MODE_FLOATING = 'floating';
-  const MODE_HIDDEN = 'hidden';
-
   const AMEX_INLINE_ANCHOR_SELECTOR = [
     '[data-testid="recommendedOffersHeader"] h1',
     '[data-testid="recommendedOffersHeader"] h2',
@@ -100,11 +96,9 @@
     }
   };
 
-  /** @type {{ buttonEl: HTMLButtonElement | null, currentMode: string | null, currentSiteId: string | null, lastHref: string, isChaseLoopRunning: boolean }} */
+  /** @type {{ buttonEl: HTMLButtonElement | null, lastHref: string, isChaseLoopRunning: boolean }} */
   const state = {
     buttonEl: null,
-    currentMode: null,
-    currentSiteId: null,
     lastHref: window.location.href,
     isChaseLoopRunning: false
   };
@@ -533,7 +527,6 @@
     button.style.display = '';
     button.classList.remove('offers-activator-button--inline', 'offers-activator-button--hidden');
     button.classList.add('offers-activator-button--floating');
-    state.currentMode = MODE_FLOATING;
   }
 
   function applyInlineMode(button, anchor) {
@@ -544,14 +537,12 @@
     button.style.display = '';
     button.classList.remove('offers-activator-button--floating', 'offers-activator-button--hidden');
     button.classList.add('offers-activator-button--inline');
-    state.currentMode = MODE_INLINE;
   }
 
   function applyHiddenMode(button) {
     button.style.display = 'none';
     button.classList.remove('offers-activator-button--floating', 'offers-activator-button--inline');
     button.classList.add('offers-activator-button--hidden');
-    state.currentMode = MODE_HIDDEN;
   }
 
   function updateActivatorButtonState(button = getActivatorButton()) {
@@ -709,7 +700,6 @@
 
   function ensureActivatorButton() {
     const site = getCurrentSite();
-    state.currentSiteId = site ? site.id : null;
     state.lastHref = window.location.href;
 
     if (!site) {
