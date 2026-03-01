@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         Credit Card Offers Activator
 // @namespace    nisc
-// @version      2026.03.01-C
+// @version      2026.03.01-E
 // @description  Adds a button to activate all visible offers on Amex, Citi, and Chase offers pages
 // @homepageURL  https://github.com/nisc/misc-userscripts
 // @downloadURL  https://raw.githubusercontent.com/nisc/misc-userscripts/main/credit-card-offers-activator.user.js
 // @author       nisc
 // @match        https://global.americanexpress.com/offers*
-// @match        https://online.citi.com/US/ag/products-offers/merchantoffers*
+// @match        https://online.citi.com/US/nga/products-offers/merchantoffers*
 // @match        https://secure.chase.com/*
 // @run-at       document-end
 // @grant        none
@@ -18,7 +18,7 @@
  *
  * Supported offers hubs:
  * - Amex: https://global.americanexpress.com/offers
- * - Citi: https://online.citi.com/US/ag/products-offers/merchantoffers
+ * - Citi: https://online.citi.com/US/nga/products-offers/merchantoffers
  * - Chase: https://secure.chase.com/web/auth/dashboard#/dashboard/merchantOffers/offer-hub
  *
  * This script adds a button. Clicking it attempts to click all
@@ -89,7 +89,7 @@
     },
     citi: {
       id: 'citi',
-      pattern: /https:\/\/online\.citi\.com\/US\/ag\/products-offers\/merchantoffers/i,
+      pattern: /https:\/\/online\.citi\.com\/US\/nga\/products-offers\/merchantoffers/i,
       placement: 'floating'
     },
     chase: {
@@ -364,10 +364,15 @@
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = [
-      '.offers-activator-button {',
+      '#offers-activator-userscript-button.offers-activator-button {',
+      '  all: unset;',
+      '  box-sizing: border-box;',
       '  position: fixed;',
-      '  right: 16px;',
-      '  bottom: 16px;',
+      '  left: 50%;',
+      '  top: 16px;',
+      '  right: auto;',
+      '  bottom: auto;',
+      '  transform: translateX(-50%);',
       '  z-index: 2147483647;',
       '  padding: 10px 14px;',
       '  border: 1px solid #1f2937;',
@@ -378,6 +383,9 @@
       '  font-size: 14px;',
       '  font-weight: 600;',
       '  cursor: pointer;',
+      '  line-height: 1.2;',
+      '  user-select: none;',
+      '  -webkit-user-select: none;',
       '  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);',
       '}',
       '.offers-activator-button--floating {',
@@ -388,6 +396,7 @@
       '.offers-activator-button--inline {',
       '  display: inline-flex;',
       '  position: static;',
+      '  transform: none;',
       '  align-items: center;',
       '  right: auto;',
       '  bottom: auto;',
