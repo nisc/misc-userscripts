@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Credit Card Offers Activator
 // @namespace    nisc
-// @version      2026.03.01-E
+// @version      2026.03.01-F
 // @description  Adds a button to activate all visible offers on Amex, Citi, and Chase offers pages
 // @homepageURL  https://github.com/nisc/misc-userscripts
 // @downloadURL  https://raw.githubusercontent.com/nisc/misc-userscripts/main/credit-card-offers-activator.user.js
@@ -261,6 +261,83 @@
     return genericControls;
   }
 
+  function isWithinActiveTabPanel(element) {
+    const tabPanel = element.closest('.tab-bar-panel');
+    if (!tabPanel) {
+      return true;
+    }
+
+    return tabPanel.classList.contains('tab-bar-panel-active');
+  }
+
+  function getVisibleCitiOfferTiles() {
+    return Array.from(document.querySelectorAll('app-mo-offer-tile')).filter((tile) => {
+      if (!(tile instanceof HTMLElement)) {
+        return false;
+      }
+
+      if (!isWithinActiveTabPanel(tile)) {
+        return false;
+      }
+
+      return isVisible(tile);
+    });
+  }
+
+  function isCitiTileEnrolled(tile) {
+    const enrolledIndicator = tile.querySelector(
+      '[title^="Enrolled in"], [aria-label^="Enrolled in"], cds-icon[name="cds-success-filled"]'
+    );
+
+    if (enrolledIndicator) {
+      return true;
+    }
+
+    const tileText = normalizeText(tile.textContent || '');
+    return tileText.includes('enrolled in');
+  }
+
+  function getCitiRemainingOfferCount() {
+    const enrollButtons = Array.from(
+      document.querySelectorAll(
+        'button[title^="Enroll in Offer for"], button[aria-label^="Enroll in Offer for"]'
+      )
+    ).filter((button) => {
+      if (!(button instanceof HTMLElement)) {
+        return false;
+      }
+
+      if (!isWithinActiveTabPanel(button)) {
+        return false;
+      }
+
+      if (!isVisible(button) || isControlDisabled(button)) {
+        return false;
+      }
+
+      return true;
+    });
+
+    if (enrollButtons.length > 0) {
+      return enrollButtons.length;
+    }
+
+    const tiles = getVisibleCitiOfferTiles();
+    if (tiles.length === 0) {
+      return getGenericActivatableControls().length;
+    }
+
+    return tiles.filter((tile) => !isCitiTileEnrolled(tile)).length;
+  }
+
+  function getRemainingOfferCount(site = getCurrentSite()) {
+    if (site && site.id === SITE_CONFIG.citi.id) {
+      return getCitiRemainingOfferCount();
+    }
+
+    return getActivatableOfferControls().length;
+  }
+
   function isChaseOfferHubUrl() {
     return CHASE_HUB_URL_PATTERN.test(window.location.href);
   }
@@ -415,9 +492,25 @@
       '.offers-activator-button--hidden {',
       '  display: none;',
       '}',
+      '#offers-activator-userscript-button.offers-activator-button.offers-activator-button--hidden {',
+      '  display: none !important;',
+      '}',
       '.offers-activator-button--disabled {',
       '  cursor: not-allowed;',
       '  opacity: 0.55;',
+      '  pointer-events: none;',
+      '}',
+      '#offers-activator-userscript-button.offers-activator-button.offers-activator-button--floating.offers-activator-button--disabled {',
+      '  background: #6b7280;',
+      '  border-color: #6b7280;',
+      '  color: #f9fafb;',
+      '  opacity: 1;',
+      '}',
+      '#offers-activator-userscript-button.offers-activator-button.offers-activator-button--inline.offers-activator-button--disabled {',
+      '  background: #e5e7eb;',
+      '  border-color: #d1d5db;',
+      '  color: #6b7280;',
+      '  opacity: 1;',
       '}'
     ].join('\n');
 
@@ -429,6 +522,7 @@
       document.body.appendChild(button);
     }
 
+    button.style.display = '';
     button.classList.remove('offers-activator-button--inline', 'offers-activator-button--hidden');
     button.classList.add('offers-activator-button--floating');
     state.currentMode = MODE_FLOATING;
@@ -439,12 +533,14 @@
       anchor.appendChild(button);
     }
 
+    button.style.display = '';
     button.classList.remove('offers-activator-button--floating', 'offers-activator-button--hidden');
     button.classList.add('offers-activator-button--inline');
     state.currentMode = MODE_INLINE;
   }
 
   function applyHiddenMode(button) {
+    button.style.display = 'none';
     button.classList.remove('offers-activator-button--floating', 'offers-activator-button--inline');
     button.classList.add('offers-activator-button--hidden');
     state.currentMode = MODE_HIDDEN;
@@ -463,7 +559,7 @@
       return;
     }
 
-    const remainingOffers = getActivatableOfferControls().length;
+    const remainingOffers = getRemainingOfferCount();
     const hasRemainingOffers = remainingOffers > 0;
 
     button.disabled = !hasRemainingOffers;
@@ -609,6 +705,10 @@
     state.lastHref = window.location.href;
 
     if (!site) {
+      const existingButton = getActivatorButton();
+      if (existingButton) {
+        applyHiddenMode(existingButton);
+      }
       return;
     }
 
