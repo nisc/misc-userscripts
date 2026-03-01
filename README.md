@@ -20,6 +20,7 @@ These scripts have been tested with Firefox and Violentmonkey on macOS, but shou
 | Script Name | Description |
 |-------------|-------------|
 | [`duplicate-tab.user.js`](duplicate-tab.user.js) | Adds cross-browser keyboard shortcut (Shift+⌘/Ctrl+E) to duplicate the current tab while preserving scroll position. |
+| [`linkedin-dismiss.user.js`](linkedin-dismiss.user.js) | Adds a floating "Dismiss" button on LinkedIn Jobs pages to bulk-click matching dismiss controls. |
 | [`linkedin-tweaks.user.js`](linkedin-tweaks.user.js) | Various usability improvements for LinkedIn (work in progress). |
 | [`unblock-shortcuts.user.js`](unblock-shortcuts.user.js) | Prevents chosen sites from hijacking browser/extension shortcuts via a configurable host-specific list. |
 | [`youtube-invidious-redirect.user.js`](youtube-invidious-redirect.user.js) | Automatically redirects YouTube watch pages to a random Invidious instance for a more privacy-focused and bloat-free viewing experience. |
