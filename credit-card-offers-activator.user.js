@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Credit Card Offers Activator
 // @namespace    nisc
-// @version      2026.03.01-A
+// @version      2026.03.01-B
 // @description  Adds a button to activate all visible offers on Amex, Citi, and Chase offers pages
 // @homepageURL  https://github.com/nisc/misc-userscripts
 // @downloadURL  https://raw.githubusercontent.com/nisc/misc-userscripts/main/credit-card-offers-activator.user.js
@@ -64,6 +64,10 @@
     /enroll in offer for/i
   ];
   const ACTIVATION_ARIA_LABEL_PATTERN = /add offer/i;
+  const CHASE_TILE_SELECTOR = '[data-cy="commerce-tile"][role="button"]';
+  const CHASE_TILE_ADD_ICON_SELECTOR = '[data-testid="commerce-tile-button"]';
+  const CHASE_TILE_ADDED_SELECTOR = '[data-testid="offer-tile-alert-container-success"]';
+  const CHASE_TILE_ADDED_TEXT_PATTERN = /success added/i;
 
   const SITE_CONFIG = {
     amex: {
@@ -151,29 +155,97 @@
     return state.buttonEl;
   }
 
-  function matchesAddOfferIntent(button) {
-    const title = normalizeText(button.getAttribute('title'));
-    const ariaLabel = normalizeText(button.getAttribute('aria-label'));
+  function getControlDescriptor(control) {
+    const title = normalizeText(control.getAttribute('title'));
+    const ariaLabel = normalizeText(control.getAttribute('aria-label'));
+    const accessibleText = normalizeText(control.getAttribute('accessible-text'));
+    const text = normalizeText(control.textContent || '');
+    return { title, ariaLabel, accessibleText, text };
+  }
+
+  function isControlDisabled(control) {
+    const ariaDisabled = normalizeText(control.getAttribute('aria-disabled')) === 'true';
+    const inactive = normalizeText(control.getAttribute('inactive')) === 'true';
+
+    if (ariaDisabled || inactive) {
+      return true;
+    }
+
+    if (control instanceof HTMLButtonElement) {
+      return control.disabled;
+    }
+
+    return false;
+  }
+
+  function matchesAddOfferIntent(control) {
+    const { title, ariaLabel, accessibleText, text } = getControlDescriptor(control);
 
     const hasActivationClass =
-      button.classList.contains('mn_button') &&
-      button.classList.contains('mn_linkOffer');
+      control.classList.contains('mn_button') &&
+      control.classList.contains('mn_linkOffer');
 
     const matchesTitle = ACTIVATION_TITLE_PATTERNS.some((pattern) => pattern.test(title));
-    const matchesAria = ACTIVATION_ARIA_LABEL_PATTERN.test(ariaLabel);
+    const matchesAria =
+      ACTIVATION_ARIA_LABEL_PATTERN.test(ariaLabel) ||
+      ACTIVATION_ARIA_LABEL_PATTERN.test(accessibleText) ||
+      ACTIVATION_ARIA_LABEL_PATTERN.test(text);
 
     return matchesTitle || matchesAria || hasActivationClass;
   }
 
-  function getActivatableOfferButtons() {
-    return Array.from(document.querySelectorAll('button')).filter((button) => {
-      const ariaDisabled = normalizeText(button.getAttribute('aria-disabled')) === 'true';
-      if (button.disabled || ariaDisabled || !isVisible(button)) {
+  function getGenericActivatableControls() {
+    return Array.from(document.querySelectorAll('button, mds-button')).filter((control) => {
+      if (!(control instanceof HTMLElement)) {
         return false;
       }
 
-      return matchesAddOfferIntent(button);
+      if (isControlDisabled(control) || !isVisible(control)) {
+        return false;
+      }
+
+      return matchesAddOfferIntent(control);
     });
+  }
+
+  function isChaseTileAlreadyAdded(tile) {
+    if (tile.querySelector(CHASE_TILE_ADDED_SELECTOR)) {
+      return true;
+    }
+
+    const ariaLabel = normalizeText(tile.getAttribute('aria-label'));
+    return CHASE_TILE_ADDED_TEXT_PATTERN.test(ariaLabel);
+  }
+
+  function getChaseActivatableTiles() {
+    return Array.from(document.querySelectorAll(CHASE_TILE_SELECTOR)).filter((tile) => {
+      if (!(tile instanceof HTMLElement)) {
+        return false;
+      }
+
+      if (isControlDisabled(tile) || !isVisible(tile)) {
+        return false;
+      }
+
+      if (isChaseTileAlreadyAdded(tile)) {
+        return false;
+      }
+
+      // Current Chase offer cards expose a plus icon when activation is available.
+      return tile.querySelector(CHASE_TILE_ADD_ICON_SELECTOR) !== null;
+    });
+  }
+
+  function getActivatableOfferControls() {
+    const site = getCurrentSite();
+    const genericControls = getGenericActivatableControls();
+
+    if (site && site.id === SITE_CONFIG.chase.id) {
+      const chaseTiles = getChaseActivatableTiles();
+      return [...genericControls, ...chaseTiles];
+    }
+
+    return genericControls;
   }
 
   function ensureStyles() {
@@ -266,7 +338,7 @@
       return;
     }
 
-    const remainingOffers = getActivatableOfferButtons().length;
+    const remainingOffers = getActivatableOfferControls().length;
     const hasRemainingOffers = remainingOffers > 0;
 
     button.disabled = !hasRemainingOffers;
@@ -296,13 +368,13 @@
   }
 
   function clickOfferButtons() {
-    const buttons = getActivatableOfferButtons();
+    const controls = getActivatableOfferControls();
 
-    buttons.forEach((button, index) => {
+    controls.forEach((control, index) => {
       const delay = index * CLICK_INTERVAL_MS;
       setTimeout(() => {
         try {
-          button.click();
+          control.click();
         } catch (_) {
           // Ignore stale or blocked elements and continue with others.
         } finally {
@@ -311,7 +383,7 @@
       }, delay);
     });
 
-    const queuedCount = buttons.length;
+    const queuedCount = controls.length;
     const finalDelay = Math.max(
       MIN_FINAL_REFRESH_DELAY_MS,
       queuedCount * CLICK_INTERVAL_MS + FINAL_SETTLE_EXTRA_MS
