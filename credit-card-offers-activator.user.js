@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Credit Card Offers Activator
 // @namespace    nisc
-// @version      2026.03.01-H
+// @version      2026.03.24-A
 // @description  Adds a button to activate all visible offers on Amex, Citi, and Chase offers pages
 // @homepageURL  https://github.com/nisc/misc-userscripts
 // @downloadURL  https://raw.githubusercontent.com/nisc/misc-userscripts/main/credit-card-offers-activator.user.js
@@ -20,6 +20,7 @@
  * - Amex: https://global.americanexpress.com/offers
  * - Citi: https://online.citi.com/US/nga/products-offers/merchantoffers
  * - Chase: https://secure.chase.com/web/auth/dashboard#/dashboard/merchantOffers/offer-hub
+ * - Chase: https://secure.chase.com/web/auth/dashboard#/dashboard/merchantOffers/thematicCollections
  *
  * This script adds a button. Clicking it attempts to click all
  * "add offer" style buttons currently visible on the page with short delays.
@@ -75,7 +76,7 @@
   const CHASE_TILE_ADD_ICON_SELECTOR = '[data-testid="commerce-tile-button"]';
   const CHASE_TILE_ADDED_SELECTOR = '[data-testid="offer-tile-alert-container-success"]';
   const CHASE_TILE_ADDED_TEXT_PATTERN = /success added/i;
-  const CHASE_HUB_URL_PATTERN = /#\/dashboard\/merchantOffers\/offer-hub(?:\?|$)/i;
+  const CHASE_HUB_URL_PATTERN = /#\/dashboard\/merchantOffers\/(?:offer-hub|thematicCollections)(?:\?|$)/i;
   const CHASE_ACTIVATED_URL_PATTERN = /#\/dashboard\/merchantOffers\/offer-activated\/[^?]+(?:\?|$)/i;
 
   const SITE_CONFIG = {
@@ -91,7 +92,7 @@
     },
     chase: {
       id: 'chase',
-      pattern: /https:\/\/secure\.chase\.com\/web\/auth\/dashboard#\/dashboard\/merchantOffers\/(?:offer-hub|offer-activated)/i,
+      pattern: /https:\/\/secure\.chase\.com\/web\/auth\/dashboard#\/dashboard\/merchantOffers\/(?:offer-hub|thematicCollections|offer-activated)/i,
       placement: 'floating'
     }
   };
@@ -202,6 +203,7 @@
     return matchesTitle || matchesAria || hasActivationClass;
   }
 
+  /** @returns {HTMLElement[]} */
   function getGenericActivatableControls() {
     return Array.from(document.querySelectorAll('button, mds-button')).filter((control) => {
       if (!(control instanceof HTMLElement)) {
@@ -225,6 +227,7 @@
     return CHASE_TILE_ADDED_TEXT_PATTERN.test(ariaLabel);
   }
 
+  /** @returns {HTMLElement[]} */
   function getChaseActivatableTiles() {
     return Array.from(document.querySelectorAll(CHASE_TILE_SELECTOR)).filter((tile) => {
       if (!(tile instanceof HTMLElement)) {
@@ -244,6 +247,7 @@
     });
   }
 
+  /** @returns {HTMLElement[]} */
   function getActivatableOfferControls() {
     const site = getCurrentSite();
     const genericControls = getGenericActivatableControls();
@@ -408,6 +412,7 @@
     return reachedHub;
   }
 
+  /** @returns {HTMLElement | null} */
   function getNextChaseActivatableTile() {
     const tiles = getChaseActivatableTiles();
     return tiles.length > 0 ? tiles[0] : null;
